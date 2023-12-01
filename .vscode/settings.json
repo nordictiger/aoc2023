@@ -1,9 +1,0 @@
-{
-    "files.associations": {
-        "optional": "cpp",
-        "unordered_map": "cpp",
-        "cmath": "cpp",
-        "sstream": "cpp",
-        "regex": "cpp"
-    }
-}
