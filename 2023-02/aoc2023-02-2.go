@@ -9,43 +9,33 @@ import (
 	"strings"
 )
 
-func checkGame(line string) (int, bool) {
-	reGame := regexp.MustCompile(`Game (\d+)`)
+func checkGame2(line string) int {
 	reGems := regexp.MustCompile(`(\d+) (blue|green|red)`)
 
 	firstSplit := strings.Split(line, ":")
 	if len(firstSplit) != 2 {
 		fmt.Println("Error: firstSplit length is not 2")
-		return 0, false
+		return -1
 	}
-	gameNumberText := reGame.FindStringSubmatch(firstSplit[0])
-	gameNumberInt, err := strconv.Atoi(gameNumberText[1])
-	if err != nil {
-		fmt.Printf("Error converting '%s' to number: %s\n", gameNumberText, err)
-		return 0, false
-	}
-
 	secondSplit := strings.Split(firstSplit[1], ";")
-	possibleGame := true
+	minGameGems := make(map[string]int)
 	for _, subSet := range secondSplit {
-		subSetGems := make(map[string]int)
 		subSetGemsMatch := reGems.FindAllStringSubmatch(subSet, -1)
 		for _, gemMatch := range subSetGemsMatch {
 			gemCountInt, err := strconv.Atoi(gemMatch[1])
 			if err != nil {
 				fmt.Printf("Error converting '%s' to number: %s\n", gemMatch[1], err)
-				return 0, false
+				return -1
 			}
-			subSetGems[gemMatch[2]] = gemCountInt
-		}
-		if subSetGems["blue"] > 14 || subSetGems["green"] > 13 || subSetGems["red"] > 12 {
-			possibleGame = false
+			if minGameGems[gemMatch[2]] < gemCountInt {
+				minGameGems[gemMatch[2]] = gemCountInt
+			}
 		}
 	}
-	return gameNumberInt, possibleGame
+	return minGameGems["blue"] * minGameGems["green"] * minGameGems["red"]
 }
 
-func puzzle1() {
+func puzzle2() {
 
 	file, err := os.Open("input.txt")
 	if err != nil {
@@ -58,12 +48,10 @@ func puzzle1() {
 	sum := 0
 	for scanner.Scan() {
 		line := scanner.Text()
-		gameNum, possibleGame := checkGame(line)
-		if possibleGame {
-			sum += gameNum
-		}
-		// fmt.Println(line)
-		// fmt.Println("gameNum:", gameNum, "possibleGame:", possibleGame)
+		gameProduct := checkGame2(line)
+		sum += gameProduct
+		// fmt.Println(line)x
+		// fmt.Println("gameProduct:", gameProduct)
 	}
 
 	if err := scanner.Err(); err != nil {
