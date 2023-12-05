@@ -117,24 +117,54 @@ func solvePuzzle1(seeds []int, maps [][][]int) int {
 
 func solvePuzzle2(seeds []int, maps [][][]int) int {
 	lowestLocation := 1<<31 - 1
+	ranges := make([][]int, 0)
 	for sp := 0; sp < len(seeds); sp += 2 {
-		fmt.Println("Seed pair:", sp, seeds[sp], seeds[sp+1])
-		for s := seeds[sp]; s < seeds[sp]+seeds[sp+1]; s++ {
-			baton := s
-			for _, seedMap := range maps {
-				for _, mapLine := range seedMap {
-					if (mapLine[1] <= baton) && (baton < mapLine[1]+mapLine[2]) {
-						baton = mapLine[0] + (baton - mapLine[1])
-						break
-					}
-				}
-			}
-			if baton < lowestLocation {
-				lowestLocation = baton
-			}
+		pair := make([]int, 2)
+		pair[0] = seeds[sp]
+		pair[1] = seeds[sp] + seeds[sp+1]
+		ranges = append(ranges, pair)
+	}
+	for _, seedMap := range maps {
+		ranges = getPairs(ranges, seedMap)
+	}
+
+	for _, pair := range ranges {
+		if pair[0] < lowestLocation {
+			lowestLocation = pair[0]
 		}
 	}
 	return lowestLocation
+}
+
+func getPairs(ranges [][]int, seedMap [][]int) [][]int {
+	newRanges := make([][]int, 0)
+	for _, pair := range ranges {
+		for _, mapLine := range seedMap {
+			// find all possible new pairs for this pair and mapLine[1] and mapLine[2]
+			if (pair[0] >= mapLine[1]) && (pair[1] < mapLine[1]+mapLine[2]) {
+				newPair := make([]int, 2)
+				newPair[0] = mapLine[0] + (pair[0] - mapLine[1])
+				newPair[1] = mapLine[0] + (pair[0] - mapLine[1]) + (pair[1] - pair[0])
+				newRanges = append(newRanges, newPair)
+			} else if (pair[0] < mapLine[1]) && (pair[1] >= mapLine[1]+mapLine[2]) {
+				newPair := make([]int, 2)
+				newPair[0] = mapLine[0]
+				newPair[1] = mapLine[0] + mapLine[2]
+				newRanges = append(newRanges, newPair)
+			} else if (pair[0] >= mapLine[1]) && (pair[0] < mapLine[1]+mapLine[2]) {
+				newPair := make([]int, 2)
+				newPair[0] = mapLine[0] + (pair[0] - mapLine[1])
+				newPair[1] = mapLine[0] + mapLine[2]
+				newRanges = append(newRanges, newPair)
+			} else if (pair[1] >= mapLine[1]) && (pair[1] <= mapLine[1]+mapLine[2]) {
+				newPair := make([]int, 2)
+				newPair[0] = mapLine[0]
+				newPair[1] = mapLine[0] + (pair[1] - mapLine[1])
+				newRanges = append(newRanges, newPair)
+			}
+		}
+	}
+	return newRanges
 }
 
 func puzzle1() {
