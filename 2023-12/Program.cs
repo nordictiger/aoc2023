@@ -1,5 +1,4 @@
-﻿using System.Text;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 partial class Program
 {
@@ -43,14 +42,6 @@ partial class Program
         if (depth == numbers.Count)
         {
             // We are at the end of the numbers
-            if (path.Count != numbers.Count)
-            {
-                Console.WriteLine("Path count and numbers count do not match at the end of numbers!");
-                Console.WriteLine($"Path count: {path.Count}");
-                Console.WriteLine($"Numbers count: {numbers.Count}");
-                Console.WriteLine($"Line: {line}");
-                Environment.Exit(1);
-            }
             if (line_start < line.Length && (line[(line_start)..]).Contains('#'))
             {
                 // We have used all numbers but there are still #s in the line
@@ -110,14 +101,11 @@ partial class Program
             var line_array = line.ToCharArray();
             foreach (var pair in s)
             {
-                // Console.Write($"({pair.Item1}, {pair.Item2})");
                 for (int j = pair.Item1; j < pair.Item1 + pair.Item2; j++)
                 {
                     line_array[j] = '#';
                 }
             }
-            // Console.WriteLine();
-
             var output = new string(line_array);
             Console.WriteLine(output);
         }
@@ -171,21 +159,23 @@ partial class Program
         return result;
     }
 
+    static Dictionary<string, long> cache = new();
+    static long cache_hits = 0;
+    static long function_calls = 0;
     static void SolvePuzzle2(List<Tuple<string, List<int>>> data)
     {
         var data2 = PrepareData2(data);
         Console.WriteLine("Solve Puzzle 2");
-        int sum = 0;
+        long sum = 0;
         foreach (var item in data2)
         {
-            Stack<(int, int)> path = new();
-            List<List<(int, int)>> solutions = new();
-            int result = SolveLine(solutions, path, item.Item1, 0, item.Item2, 0);
-            Console.WriteLine(item.Item1);
-            Console.WriteLine($"Result: {result}");
+            var result = SolveLine2(item.Item1, item.Item2);
             sum += result;
         }
         Console.WriteLine($"Sum: {sum}");
+        Console.WriteLine($"Cache hits: {cache_hits}");
+        Console.WriteLine($"Function calls: {function_calls}");
+        Console.WriteLine($"Cache hit ratio: {(double)cache_hits / function_calls}");
     }
 
     static void Main()
@@ -195,6 +185,5 @@ partial class Program
         Console.WriteLine($"Loaded {data.Count} lines of data");
         SolvePuzzle1(data);
         SolvePuzzle2(data);
-
     }
 }
