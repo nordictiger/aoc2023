@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/heap"
 	"fmt"
 	"math"
 )
@@ -12,167 +13,175 @@ const (
 	Down
 	Left
 	Right
+	Undefined
 )
+
+func (d Direction) opposite() Direction {
+	switch d {
+	case Up:
+		return Down
+	case Down:
+		return Up
+	case Left:
+		return Right
+	case Right:
+		return Left
+	default:
+		return Undefined
+	}
+}
 
 type Point struct {
 	x, y int
 }
 
-type CityBlock struct {
-	value       int
-	visited     bool
+func (p Point) getNextPoint(direction Direction, stepSize int) Point {
+	switch direction {
+	case Right:
+		return Point{p.x, p.y + stepSize}
+	case Down:
+		return Point{p.x + stepSize, p.y}
+	case Up:
+		return Point{p.x - stepSize, p.y}
+	case Left:
+		return Point{p.x, p.y - stepSize}
+	default:
+		panic("Can not move to unknown direction")
+	}
+}
+
+type Block struct {
+	address          Point
+	directionToBlock Direction
+	stepsInDirection int
+}
+
+type HeapBlock struct {
+	Block
 	minHeatLoss int
+	index       int // heap needs this
 }
 
-func createSolvingMap(data [][]int) [][]CityBlock {
-	solvingMap := make([][]CityBlock, len(data))
-	for x := 0; x < len(data); x++ {
-		solvingMap[x] = make([]CityBlock, len(data[0]))
-		for y := 0; y < len(data[0]); y++ {
-			solvingMap[x][y] = CityBlock{data[x][y], false, math.MaxInt}
+func processBlock(currentBlock HeapBlock, exploredMap *map[Block]int, queue *PriorityQueue, data [][]int, direction Direction, minSteps int, maxSteps int) {
+
+	currentDirection := currentBlock.directionToBlock
+	if currentDirection == direction.opposite() {
+		// can not go back
+		return
+	}
+
+	stepsInDirection := currentBlock.stepsInDirection
+	var nextPoint Point
+	if currentDirection == direction {
+		if stepsInDirection == maxSteps {
+			return
+		} else {
+			stepsInDirection++
 		}
+		nextPoint = currentBlock.address.getNextPoint(direction, 1)
+	} else {
+		stepsInDirection = minSteps
+		nextPoint = currentBlock.address.getNextPoint(direction, minSteps)
 	}
-	return solvingMap
+
+	if nextPoint.x < 0 || nextPoint.x >= len(data) || nextPoint.y < 0 || nextPoint.y >= len(data[0]) {
+		// can not go outside of map
+		return
+	}
+	nextBlock := Block{nextPoint, direction, stepsInDirection}
+	_, ok := (*exploredMap)[nextBlock]
+	if ok {
+		// already explored
+		return
+	}
+
+	newMinHeatLoss := getNewHeatLoss(currentBlock, direction, nextPoint, data)
+	newHeapBlock := HeapBlock{nextBlock, newMinHeatLoss, 0}
+	// Push takes care of upsert logic
+	heap.Push(queue, &newHeapBlock)
 }
 
-func getSmallestBlock(queue map[Point]int, solvingMap [][]CityBlock) Point {
-	min := math.MaxInt
-	var minPoint Point
-	for point, heatLoss := range queue {
-		if heatLoss < min {
-			min = heatLoss
-			minPoint = point
-		} else if heatLoss == min {
-			if point.y > minPoint.y {
-				min = heatLoss
-				minPoint = point
-			} else if point.y == minPoint.y {
-				if point.x > minPoint.x {
-					min = heatLoss
-					minPoint = point
-				}
-			}
-		}
-	}
-	delete(queue, minPoint)
-	return minPoint
-}
+func calculateDijkstra(data [][]int, minSteps int, maxSteps int) map[Block]int {
+	exploredMap := make(map[Block]int)
 
-func processBlock(currentPoint Point, nextPoint Point, solvingMap [][]CityBlock, queue *map[Point]int) {
-	nextBlock := solvingMap[nextPoint.x][nextPoint.y]
-	newMinHeatLoss := nextBlock.value + solvingMap[currentPoint.x][currentPoint.y].minHeatLoss
-	if nextBlock.minHeatLoss > newMinHeatLoss {
-		solvingMap[nextPoint.x][nextPoint.y].minHeatLoss = newMinHeatLoss
-		(*queue)[nextPoint] = newMinHeatLoss
-	}
-}
+	pq := make(PriorityQueue, 0)
+	heap.Init(&pq)
+	heap.Push(&pq, &HeapBlock{Block{Point{0, 0}, Undefined, 0}, 0, 0})
+	data[0][0] = 0
 
-func resolveUp(currentPoint Point, solvingMap [][]CityBlock, queue *map[Point]int) {
-	nextX := currentPoint.x - 1
-	nextY := currentPoint.y
-	if nextX >= 0 && !solvingMap[nextX][nextY].visited {
-		// Moving Up is valid move
-		processBlock(currentPoint, Point{nextX, nextY}, solvingMap, queue)
-	}
-}
-
-func resolveRight(currentPoint Point, solvingMap [][]CityBlock, queue *map[Point]int) {
-	nextX := currentPoint.x
-	nextY := currentPoint.y + 1
-
-	if nextY < len(solvingMap[0]) && !solvingMap[nextX][nextY].visited {
-		// Moving Right is valid move
-		processBlock(currentPoint, Point{nextX, nextY}, solvingMap, queue)
-	}
-}
-
-func resolveDown(currentPoint Point, solvingMap [][]CityBlock, queue *map[Point]int) {
-	nextX := currentPoint.x + 1
-	nextY := currentPoint.y
-	if nextX < len(solvingMap) && !solvingMap[nextX][nextY].visited {
-		// Moving Down is valid move
-		processBlock(currentPoint, Point{nextX, nextY}, solvingMap, queue)
-	}
-}
-
-func resolveLeft(currentPoint Point, solvingMap [][]CityBlock, queue *map[Point]int) {
-	nextX := currentPoint.x
-	nextY := currentPoint.y - 1
-	if nextY >= 0 && !solvingMap[nextX][nextY].visited {
-		// Moving Left is valid move
-		processBlock(currentPoint, Point{nextX, nextY}, solvingMap, queue)
-	}
-}
-
-func calculateDijkstra(solvingMap [][]CityBlock) {
-	queue := make(map[Point]int)
-	/*
-		solvingMap[0][0].value = 0
-		solvingMap[0][0].minHeatLoss = 0
-		queue[Point{0, 0}] = 0
-	*/
-	solvingMap[len(solvingMap)-1][len(solvingMap[0])-1].value = 0
-	solvingMap[len(solvingMap)-1][len(solvingMap[0])-1].minHeatLoss = 0
-	queue[Point{len(solvingMap) - 1, len(solvingMap[0]) - 1}] = 0
-
-	for len(queue) > 0 {
-		nextBlock := getSmallestBlock(queue, solvingMap)
-		solvingMap[nextBlock.x][nextBlock.y].visited = true
+	for len(pq) > 0 {
 		/*
-			if nextBlock.x == len(solvingMap)-1 && nextBlock.y == len(solvingMap[0])-1 {
-				break
+			if len(exploredMap)%10000 == 0 {
+				fmt.Println("Explored map size:", len(exploredMap))
+				fmt.Println("Heap size:", len(pq))
+			}
+			if len(pq)%10000 == 0 {
+				fmt.Println("Explored map size:", len(exploredMap))
+				fmt.Println("Heap size:", len(pq))
 			}
 		*/
-		resolveRight(nextBlock, solvingMap, &queue)
-		resolveDown(nextBlock, solvingMap, &queue)
-		resolveUp(nextBlock, solvingMap, &queue)
-		resolveLeft(nextBlock, solvingMap, &queue)
+		nextBlock := heap.Pop(&pq).(*HeapBlock)
+		exploredMap[nextBlock.Block] = nextBlock.minHeatLoss
+
+		processBlock(*nextBlock, &exploredMap, &pq, data, Right, minSteps, maxSteps)
+		processBlock(*nextBlock, &exploredMap, &pq, data, Down, minSteps, maxSteps)
+		processBlock(*nextBlock, &exploredMap, &pq, data, Up, minSteps, maxSteps)
+		processBlock(*nextBlock, &exploredMap, &pq, data, Left, minSteps, maxSteps)
 	}
+
+	return exploredMap
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-func puzzle1(data [][]int) int {
-	solvingMap := createSolvingMap(data)
-	calculateDijkstra(solvingMap)
-	for x := 0; x < len(solvingMap); x++ {
-		for y := 0; y < len(solvingMap[0]); y++ {
-			solvingMap[x][y].visited = false
+func getNewHeatLoss(currentBlock HeapBlock, direction Direction, nextPoint Point, data [][]int) int {
+	newHeatLoss := currentBlock.minHeatLoss
+	switch direction {
+	case Up:
+		for x := currentBlock.address.x - 1; x >= nextPoint.x; x-- {
+			newHeatLoss += data[x][nextPoint.y]
+		}
+	case Down:
+		for x := currentBlock.address.x + 1; x <= nextPoint.x; x++ {
+			newHeatLoss += data[x][nextPoint.y]
+		}
+	case Left:
+		for y := currentBlock.address.y - 1; y >= nextPoint.y; y-- {
+			newHeatLoss += data[nextPoint.x][y]
+		}
+	case Right:
+		for y := currentBlock.address.y + 1; y <= nextPoint.y; y++ {
+			newHeatLoss += data[nextPoint.x][y]
 		}
 	}
-	solvingMap[len(solvingMap)-1][len(solvingMap[0])-1].value = data[len(data)-1][len(data[0])-1]
-	solvingMap[0][0].value = 0
-	solvingMap[0][0].minHeatLoss = 0
+	return newHeatLoss
+}
 
-	printData(data)
-	printMap(solvingMap)
-	// printMapPath(solvingMap, path)
-	path := Stack{}
-
-	min := max(solvingMap[1][1].minHeatLoss, solvingMap[0][1].minHeatLoss)
-	// get first proxy number
-	path = Stack{}
-	found := false
-
-	for !found {
-		findPath(solvingMap, 1, 0, Down, 1, 0, &min, &found, &path)
-		fmt.Println("min: ", min, "found: ", found)
-		min++
+func puzzle1(data [][]int) int {
+	exploredMap := calculateDijkstra(data, 1, 3)
+	minHeatLoss := math.MaxInt
+	for block, heatLoss := range exploredMap {
+		if block.address.x == len(data)-1 && block.address.y == len(data[0])-1 {
+			if heatLoss < minHeatLoss {
+				minHeatLoss = heatLoss
+			}
+		}
 	}
-	return min
+	return minHeatLoss
 }
 
 func puzzle2(data [][]int) int {
-	sum := 0
-	return sum
+	exploredMap := calculateDijkstra(data, 4, 10)
+	minHeatLoss := math.MaxInt
+	for block, heatLoss := range exploredMap {
+		if block.address.x == len(data)-1 && block.address.y == len(data[0])-1 {
+			if heatLoss < minHeatLoss {
+				minHeatLoss = heatLoss
+			}
+		}
+	}
+	return minHeatLoss
 }
 
 func main() {
-	// cityMap, _ := loadData("input-test2.txt")
 	// cityMap, _ := loadData("input-test.txt")
 	cityMap, _ := loadData("input.txt")
 	fmt.Println("Puzzle 1: ", puzzle1(cityMap))
