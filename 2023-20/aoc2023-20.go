@@ -1,195 +1,112 @@
 package main
 
 import (
+	"crypto/sha256"
 	"fmt"
-	"strconv"
 )
 
-type instruction struct {
-	direction string
-	distance  int
-	color     string
+var counter int
+
+func hash(str string) string {
+	hasher := sha256.New()
+	hasher.Write([]byte(str))
+	hashBytes := hasher.Sum(nil)
+	hashString := fmt.Sprintf("%x", hashBytes)
+	return hashString
 }
 
-type point struct {
-	x int
-	y int
-}
-
-type turn int
-
-const (
-	Left turn = iota
-	Right
-)
-
-type edge struct {
-	start       point
-	turnToStart turn
-	end         point
-	turnFromEnd turn
-}
-
-func getTurn(currentDirection, nextDirection string) turn {
-	switch currentDirection {
-	case "U":
-		switch nextDirection {
-		case "R":
-			return Right
-		case "L":
-			return Left
-		}
-	case "R":
-		switch nextDirection {
-		case "D":
-			return Right
-		case "U":
-			return Left
-		}
-	case "D":
-		switch nextDirection {
-		case "L":
-			return Right
-		case "R":
-			return Left
-		}
-	case "L":
-		switch nextDirection {
-		case "U":
-			return Right
-		case "D":
-			return Left
+func compileIncoming(mc *moduleConfiguration) {
+	for k, node := range *mc {
+		if node.moduleType == Conjunction {
+			for searchKey, searchNode := range *mc {
+				for _, out := range searchNode.outgoing {
+					if out == k {
+						node.incoming[searchKey] = Low
+					}
+				}
+			}
 		}
 	}
-	panic("Possible turn not found.")
 }
 
-func getShift(lastTurn, nextTurn turn) int {
-	// This probably depends on the winding order of the polygon
-	switch lastTurn {
-	case Left:
-		switch nextTurn {
-		case Left:
-			return -1
-		case Right:
-			return 0
+func processSignal(s signal, mc moduleConfiguration, q *Queue) {
+	node := mc[s.destination]
+	switch node.moduleType {
+	case Broadcaster:
+		for _, out := range node.outgoing {
+			q.Enqueue(signal{s.destination, s.level, out})
 		}
-	case Right:
-		switch nextTurn {
-		case Left:
-			return 0
-		case Right:
-			return 1
+	case FlipFlop:
+		if s.level == Low {
+			node.state = node.state.getReverse()
+			mc[s.destination] = node
+			for _, out := range node.outgoing {
+				q.Enqueue(signal{s.destination, node.state, out})
+			}
+		}
+	case Conjunction:
+		node.incoming[s.source] = s.level
+		mc[s.destination] = node
+		allHigh := true
+		for _, in := range node.incoming {
+			if in == Low {
+				allHigh = false
+			}
+		}
+		sendLevel := High
+		if allHigh {
+			sendLevel = Low
+		}
+		for _, out := range node.outgoing {
+			q.Enqueue(signal{s.destination, sendLevel, out})
 		}
 	}
-	panic("Possible shift not found.")
 }
 
-func abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
-func getEdges(data []instruction) []edge {
-	edges := make([]edge, 0)
-	startingPoint := point{0, 0}
-	lastTurn := getTurn(data[len(data)-1].direction, data[0].direction)
-	var nextTurn turn
-	for i := 0; i < len(data); i++ {
-		aciveInstruction := data[i]
-		j := i + 1
-		if i == len(data)-1 {
-			j = 0
+func pushButton(mc moduleConfiguration) {
+	q := make(Queue, 0)
+	q.Enqueue(signal{"button", Low, "broadcaster"})
+	for {
+		s, ok := q.Dequeue()
+		if !ok {
+			break
 		}
-		nextInstruction := data[j]
-		nextTurn = getTurn(aciveInstruction.direction, nextInstruction.direction)
-
-		var newEdge edge
-		shift := getShift(lastTurn, nextTurn)
-		newEdge.start = startingPoint
-		newEdge.turnToStart = lastTurn
-		newEdge.end = startingPoint
-		newEdge.turnFromEnd = nextTurn
-		switch aciveInstruction.direction {
-		case "U":
-			newEdge.end.y += (aciveInstruction.distance + shift)
-		case "R":
-			newEdge.end.x += (aciveInstruction.distance + shift)
-		case "D":
-			newEdge.end.y -= (aciveInstruction.distance + shift)
-		case "L":
-			newEdge.end.x -= (aciveInstruction.distance + shift)
-		}
-		edges = append(edges, newEdge)
-		startingPoint = newEdge.end
-		lastTurn = nextTurn
-	}
-	return edges
-}
-
-func signedArea(edges []edge) int {
-	area := 0
-	n := len(edges)
-	for i := 0; i < n-1; i++ {
-		sa := (edges[i].end.x * edges[i+1].end.y) - (edges[i+1].end.x * edges[i].end.y)
-		area += sa
-	}
-	return area / 2
-}
-
-func puzzle1(diggingInstructions []instruction) int {
-	edges := getEdges(diggingInstructions)
-	signedArea := signedArea(edges)
-	fmt.Println("signedArea", signedArea)
-	return abs(signedArea)
-}
-
-func getDistance(color string) int {
-	hexString := color[1 : len(color)-1]
-	decimalNumber, err := strconv.ParseInt(hexString, 16, 64)
-	if err != nil {
-		fmt.Println("Error:", err)
-		panic("Error converting hexadecimal string to decimal number.")
-	} else {
-		return int(decimalNumber)
+		processSignal(s, mc, &q)
+		// fmt.Println(s)
+		counter++
 	}
 }
 
-func getDirection(color string) string {
-	switch color[len(color)-1:] {
-	case "0":
-		return "R"
-	case "1":
-		return "D"
-	case "2":
-		return "L"
-	case "3":
-		return "U"
+func puzzle1(mc moduleConfiguration) int {
+	sum := 0
+	counter = 0
+	compileIncoming(&mc)
+	initialStateHash := hash(fmt.Sprintf("%v", mc))
+	newStateHash := ""
+	fmt.Println("Initial state:", initialStateHash)
+	pushCounter := 0
+	for initialStateHash != newStateHash {
+		pushButton(mc)
+		pushCounter++
+		newStateHash = hash(fmt.Sprintf("%v", mc))
+		fmt.Println("New state:", newStateHash, "Pushcounter:", pushCounter, "Counter:", counter)
+		if pushCounter > 100 {
+			break
+		}
 	}
-	panic("New instruction not found.")
+	return sum
 }
 
-func reprocessInstructions(diggingInstructions []instruction) []instruction {
-	newInstructions := make([]instruction, 0)
-	for _, i := range diggingInstructions {
-		newInstructions = append(newInstructions, instruction{getDirection(i.color), getDistance(i.color), i.color})
-	}
-	return newInstructions
-}
-func puzzle2(diggingInstructions []instruction) int {
-	newInstructions := reprocessInstructions(diggingInstructions)
-	edges := getEdges(newInstructions)
-	signedArea := signedArea(edges)
-	fmt.Println("signedArea", signedArea)
-	return abs(signedArea)
+func puzzle2() int {
+	sum := 0
+	return sum
 }
 
 func main() {
-	// diggingInstructions, _ := loadData("input-test.txt")
-	diggingInstructions, _ := loadData("input.txt")
-	fmt.Println("Puzzle 1: ", puzzle1(diggingInstructions))
-	fmt.Println("Puzzle 2: ", puzzle2(diggingInstructions))
-
+	//
+	// mc := loadData("input-test.txt")
+	// mc := loadData("input-test2.txt")
+	mc := loadData("input.txt")
+	fmt.Println("Puzzle 1: ", puzzle1(mc))
+	fmt.Println("Puzzle 2: ", puzzle2())
 }
