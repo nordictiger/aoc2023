@@ -2,38 +2,38 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"os"
-	"regexp"
-	"strconv"
+	"strings"
 )
 
-func loadData(fileName string) ([]instruction, error) {
+func loadData(fileName string) moduleConfiguration {
 	file, err := os.Open(fileName)
 	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return nil, err
+		panic("Error opening file: " + err.Error())
 	}
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
-	data := make([]instruction, 0)
-	re := regexp.MustCompile(`([URDL]) (\d+) \((.+)\)`)
+	data := make(moduleConfiguration, 0)
 	for scanner.Scan() {
 		if err := scanner.Err(); err != nil {
-			fmt.Println("Error reading from file:", err)
-			return nil, err
+			panic("Error reading from file: " + err.Error())
 		}
-		matches := re.FindStringSubmatch(scanner.Text())
-		if len(matches) != 4 {
-			continue
+		parts := strings.Split(scanner.Text(), " -> ")
+		var m moduleType
+		key := ""
+		switch parts[0][0] {
+		case '%':
+			m = FlipFlop
+			key = parts[0][1:]
+		case '&':
+			m = Conjunction
+			key = parts[0][1:]
+		default:
+			m = Broadcaster
+			key = parts[0]
 		}
-		meters, err := strconv.Atoi(matches[2])
-		if err != nil {
-			fmt.Println("Error converting to int:", err)
-			return nil, err
-		}
-		data = append(data, instruction{matches[1], meters, matches[3]})
+		outgoing := make(map[string]state, 0)
+		data[key] = node{key, m, Low, outgoing, strings.Split(parts[1], ", ")}
 	}
-	return data, nil
-
+	return data
 }
