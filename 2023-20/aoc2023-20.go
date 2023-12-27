@@ -1,22 +1,15 @@
 package main
 
 import (
-	"crypto/sha256"
 	"fmt"
+	"strconv"
+	"time"
 )
 
 var (
 	lowCounter  int
 	highCounter int
 )
-
-func hash(str string) string {
-	hasher := sha256.New()
-	hasher.Write([]byte(str))
-	hashBytes := hasher.Sum(nil)
-	hashString := fmt.Sprintf("%x", hashBytes)
-	return hashString
-}
 
 func compileIncoming(mc *moduleConfiguration) {
 	for k, node := range *mc {
@@ -84,56 +77,41 @@ func pushButton(mc moduleConfiguration) {
 	}
 }
 
-func pushButton2(mc moduleConfiguration) bool {
-	q := make(Queue, 0)
-	q.Enqueue(signal{"button", Low, "broadcaster"})
-	for {
-		s, ok := q.Dequeue()
-		if !ok {
-			break
-		}
-		if s.level == Low {
-			lowCounter++
-		} else {
-			highCounter++
-		}
-		processSignal(s, mc, &q)
-		if s.destination == "rx" && s.level == Low {
-			fmt.Println("Found it!")
-			return true
-		}
-	}
-	return false
-}
-
 func puzzle1(mc moduleConfiguration) int {
 	lowCounter = 0
 	highCounter = 0
 	compileIncoming(&mc)
-	initialStateHash := hash(fmt.Sprintf("%v", mc))
-	newStateHash := ""
-	// fmt.Println("Initial state:", initialStateHash)
-	pushCounter := 0
-	for initialStateHash != newStateHash {
+	for i := 0; i < 1000; i++ {
 		pushButton(mc)
-		pushCounter++
-		newStateHash = hash(fmt.Sprintf("%v", mc))
-		// fmt.Println("New state:", newStateHash, "Pushcounter:", pushCounter, "lowCounter:", lowCounter, "highCounter:", highCounter)
-		if pushCounter >= 1000 {
-			break
-		}
 	}
 	return lowCounter * highCounter
 }
 
 func puzzle2(mc moduleConfiguration) int {
 	compileIncoming(&mc)
-	printDeps(mc, "rx", 4)
-	pushButton(mc)
-	printDeps(mc, "rx", 4)
-	pushButton(mc)
-	printDeps(mc, "rx", 4)
 	pushCounter := 0
+	for {
+		clearScreen()
+		printConfiguration(mc, []string{"lq", "hd", "mn"}) // "jn",
+		fmt.Print("Pushcounter:", pushCounter, " <enter> - next, <num> - num times, q - quit:")
+		time.Sleep(10 * time.Millisecond)
+		var command string
+		fmt.Scanln(&command)
+		if command == "q" {
+			break
+		} else if command == "" {
+			pushButton(mc)
+			pushCounter++
+		} else {
+			count, err := strconv.Atoi(command)
+			if err == nil {
+				for i := 0; i < count; i++ {
+					pushButton(mc)
+					pushCounter++
+				}
+			}
+		}
+	}
 	return pushCounter
 }
 
@@ -143,10 +121,11 @@ func main() {
 	// mc := loadData("input-test2.txt")
 
 	mc := loadData("input.txt")
-	result1 := puzzle1(mc)
-	fmt.Println("Puzzle 1: ", result1)
-	// 670984704
-
-	mc = loadData("input.txt")
+	/*
+		result1 := puzzle1(mc)
+		fmt.Println("Puzzle 1: ", result1)
+		// 670984704
+		mc = loadData("input.txt")
+	*/
 	fmt.Println("Puzzle 2: ", puzzle2(mc))
 }

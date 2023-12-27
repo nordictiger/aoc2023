@@ -15,7 +15,7 @@ const (
 )
 
 func (mt moduleType) String() string {
-	return [...]string{"Broadcaster", "FlipFlop", "Conjunction"}[mt]
+	return [...]string{"bc ", "%", "&"}[mt]
 }
 
 type state int
@@ -34,7 +34,7 @@ func (s state) getReverse() state {
 }
 
 func (s state) String() string {
-	return [...]string{"low", "high"}[s]
+	return [...]string{"0", "1"}[s]
 }
 
 type incoming map[string]state
