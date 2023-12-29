@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"sort"
 )
 
 func contains[T comparable](slice []T, val T) bool {
@@ -34,11 +35,21 @@ func printConfigurationNode(mc moduleConfiguration, previousKey, moduleKey strin
 	}
 	fmt.Println()
 	(*visisted)[previousKey+moduleKey] = true
-	for _, node := range mc[moduleKey].outgoing {
+	sortedOutgoing := getWeights(mc, moduleKey)
+	for _, node := range sortedOutgoing {
 		if !(*visisted)[moduleKey+node] && !contains(ignoreList, node) {
 			printConfigurationNode(mc, moduleKey, node, ignoreList, level+1, visisted)
 		}
 	}
+}
+
+func getWeights(mc moduleConfiguration, moduleKey string) []string {
+	var weights []string
+	weights = append(weights, mc[moduleKey].outgoing...)
+	sort.Slice(weights, func(i, j int) bool {
+		return len(mc[weights[i]].incoming) > len(mc[weights[j]].incoming)
+	})
+	return weights
 }
 
 func clearScreen() {

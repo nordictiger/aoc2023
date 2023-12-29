@@ -73,7 +73,6 @@ func pushButton(mc moduleConfiguration) {
 			highCounter++
 		}
 		processSignal(s, mc, &q)
-		// fmt.Println(s)
 	}
 }
 
@@ -92,7 +91,7 @@ func puzzle2(mc moduleConfiguration) int {
 	pushCounter := 0
 	for {
 		clearScreen()
-		printConfiguration(mc, []string{"lq", "hd", "mn"}) // "jn",
+		printConfiguration(mc, []string{"lq", "jn", "mn"}) //, "hd"
 		fmt.Print("Pushcounter:", pushCounter, " <enter> - next, <num> - num times, q - quit:")
 		time.Sleep(10 * time.Millisecond)
 		var command string
@@ -116,16 +115,16 @@ func puzzle2(mc moduleConfiguration) int {
 }
 
 func main() {
-	//
 	// mc := loadData("input-test.txt")
 	// mc := loadData("input-test2.txt")
-
 	mc := loadData("input.txt")
-	/*
-		result1 := puzzle1(mc)
-		fmt.Println("Puzzle 1: ", result1)
-		// 670984704
-		mc = loadData("input.txt")
-	*/
+	result1 := puzzle1(mc)
+	fmt.Println("Puzzle 1: ", result1)
+	// mc := loadData("input-test.txt")
+	// mc := loadData("input-test2.txt")
+	mc = loadData("input.txt")
+	// Not a solution, just visualization, not sure its possible to solve this puzzle
+	// without analyzing the input
 	fmt.Println("Puzzle 2: ", puzzle2(mc))
+
 }
