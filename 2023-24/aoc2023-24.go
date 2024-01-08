@@ -97,7 +97,6 @@ func calculateIntrsectionsInRange(lines []line, minPos, maxPos float64) int {
 			if !isIntersectionInFuture(lines[i], lines[j], intersection) {
 				continue
 			}
-			// fmt.Println("Match:", lines[i], lines[j], intersection)
 			count++
 		}
 	}
@@ -106,11 +105,6 @@ func calculateIntrsectionsInRange(lines []line, minPos, maxPos float64) int {
 
 func puzzle1(lines []line, minPos, maxPos float64) int {
 	sum := calculateIntrsectionsInRange(lines, minPos, maxPos)
-	return sum
-}
-
-func puzzle2(lines []line) int {
-	sum := 0
 	return sum
 }
 
