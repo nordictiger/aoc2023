@@ -158,9 +158,6 @@ func puzzle1(diagram map[string][]string) int {
 }
 
 func main() {
-
 	diagram := loadData("input.txt")
 	fmt.Println("Puzzle 1: ", puzzle1(diagram))
-	// fmt.Println("Puzzle 1: ", puzzle1V2(diagram))
-
 }
